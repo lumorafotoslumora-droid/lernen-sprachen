@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lernen Sprachen — Karteikarten</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%97%82%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <h1>🗂️ Lernen Sprachen</h1>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="practice">Üben</button>
+    <button class="tab-btn" data-tab="manage">Karten verwalten</button>
+    <button class="tab-btn" data-tab="data">Import / Export</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- PRACTICE TAB -->
+  <section id="tab-practice" class="tab-panel active">
+
+    <div class="controls-bar">
+      <label>
+        Von
+        <select id="lang-from">
+          <option value="sl">🇸🇮 Slovenščina</option>
+          <option value="en">🇬🇧 English</option>
+          <option value="de" selected>🇩🇪 Deutsch</option>
+          <option value="fr">🇫🇷 Français</option>
+        </select>
+      </label>
+      <button id="swap-langs" title="Sprachen tauschen">⇄</button>
+      <label>
+        Nach
+        <select id="lang-to">
+          <option value="sl">🇸🇮 Slovenščina</option>
+          <option value="en">🇬🇧 English</option>
+          <option value="de">🇩🇪 Deutsch</option>
+          <option value="fr" selected>🇫🇷 Français</option>
+        </select>
+      </label>
+      <label>
+        Kategorie
+        <select id="category-filter">
+          <option value="all">Alle</option>
+        </select>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="due-only">
+        Nur fällige Karten
+      </label>
+    </div>
+
+    <div class="progress-bar">
+      <span id="progress-text">0 / 0</span>
+      <div class="progress-track"><div id="progress-fill"></div></div>
+    </div>
+
+    <div id="practice-area">
+      <div id="empty-state" class="hidden">
+        <p>🎉 Keine Karten für diese Auswahl gefunden.</p>
+        <p>Füge neue Karten hinzu oder ändere die Kategorie/Filter.</p>
+      </div>
+
+      <div id="flashcard" class="flashcard hidden">
+        <div class="flashcard-inner">
+          <div class="flashcard-face flashcard-front">
+            <div class="card-category" id="front-category"></div>
+            <img id="front-image" class="card-image hidden" alt="">
+            <div class="card-word" id="front-word"></div>
+            <button class="speak-btn" id="speak-front" title="Aussprache anhören">🔊</button>
+            <div class="flip-hint">Klicken zum Umdrehen</div>
+          </div>
+          <div class="flashcard-face flashcard-back">
+            <div class="card-category" id="back-category"></div>
+            <img id="back-image" class="card-image hidden" alt="">
+            <div class="card-word" id="back-word"></div>
+            <button class="speak-btn" id="speak-back" title="Aussprache anhören">🔊</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="answer-buttons" class="answer-buttons hidden">
+        <button id="btn-unknown" class="btn btn-unknown">✗ Nochmal üben</button>
+        <button id="btn-known" class="btn btn-known">✓ Ich wusste es</button>
+      </div>
+    </div>
+
+    <div id="session-summary" class="modal hidden">
+      <div class="modal-content">
+        <h2>Runde geschafft! 🎉</h2>
+        <p id="summary-text"></p>
+        <div class="modal-actions">
+          <button id="btn-restart-all" class="btn">Nochmal alle</button>
+          <button id="btn-restart-wrong" class="btn btn-primary">Nur Fehler wiederholen</button>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- MANAGE TAB -->
+  <section id="tab-manage" class="tab-panel">
+    <div class="manage-layout">
+      <form id="card-form" class="card-form">
+        <h2 id="form-title">Neue Karte hinzufügen</h2>
+        <input type="hidden" id="edit-id">
+
+        <label>Kategorie
+          <input type="text" id="field-category" list="category-list" placeholder="z. B. Tiere">
+          <datalist id="category-list"></datalist>
+        </label>
+
+        <div class="lang-fields">
+          <label>🇸🇮 Slovenščina <input type="text" id="field-sl" required></label>
+          <label>🇬🇧 English <input type="text" id="field-en" required></label>
+          <label>🇩🇪 Deutsch <input type="text" id="field-de" required></label>
+          <label>🇫🇷 Français <input type="text" id="field-fr" required></label>
+        </div>
+
+        <label>Bild-URL (optional)
+          <input type="url" id="field-image-url" placeholder="https://...">
+        </label>
+        <label>oder Bild hochladen (optional)
+          <input type="file" id="field-image-file" accept="image/*">
+        </label>
+        <img id="image-preview" class="image-preview hidden" alt="Vorschau">
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="submit-btn">Karte hinzufügen</button>
+          <button type="button" class="btn hidden" id="cancel-edit-btn">Abbrechen</button>
+        </div>
+      </form>
+
+      <div class="card-list-wrap">
+        <div class="list-toolbar">
+          <input type="search" id="search-cards" placeholder="Karten durchsuchen...">
+          <span id="card-count"></span>
+        </div>
+        <div id="card-list" class="card-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATA TAB -->
+  <section id="tab-data" class="tab-panel">
+    <div class="data-panel">
+      <h2>Daten sichern & übertragen</h2>
+      <p>Exportiere deine Karten als Datei, um sie zu sichern oder mit jemandem zu teilen. Importiere eine zuvor exportierte Datei, um Karten wiederherzustellen oder hinzuzufügen.</p>
+
+      <div class="data-actions">
+        <button id="export-btn" class="btn">⬇️ Karten exportieren (JSON)</button>
+        <label class="btn file-label">
+          ⬆️ Karten importieren
+          <input type="file" id="import-input" accept="application/json" class="hidden">
+        </label>
+      </div>
+
+      <hr>
+      <h2>Zurücksetzen</h2>
+      <p>Setzt alle Karten auf die Standard-Wortliste zurück. Eigene Karten und dein Lernfortschritt gehen dabei verloren.</p>
+      <button id="reset-btn" class="btn btn-danger">🗑️ Auf Standard zurücksetzen</button>
+    </div>
+  </section>
+
+</main>
+
+<footer class="app-footer">
+  <p>Karteikarten für Slowenisch · English · Deutsch · Français — deine Daten bleiben lokal im Browser gespeichert.</p>
+</footer>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
