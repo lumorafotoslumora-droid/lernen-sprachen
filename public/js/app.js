@@ -1,5 +1,6 @@
 /* Lernen Sprachen — Karteikarten-App
- * Vanilla JS, no build step, all data stored in localStorage in the browser.
+ * Vanilla JS, no build step. Karten & Lernfortschritt liegen auf dem
+ * Server (pro angemeldetem Konto); nur UI-Einstellungen bleiben lokal.
  */
 
 const LANGS = {
@@ -9,12 +10,7 @@ const LANGS = {
   fr: { name: 'Français', speech: 'fr-FR' },
 };
 
-const STORAGE = {
-  cards: 'lls_cards_v1',
-  progress: 'lls_progress_v1',
-  settings: 'lls_settings_v1',
-};
-
+const SETTINGS_KEY = 'lls_settings_v2';
 const DAY = 24 * 60 * 60 * 1000;
 const BOX_INTERVALS = [0, DAY, 3 * DAY, 7 * DAY, 14 * DAY, 30 * DAY];
 
@@ -30,36 +26,73 @@ let sessionWrongIds = [];
 let currentCardId = null;
 let editingImageDataUrl = '';
 
-// ---------- Persistence ----------
+// ---------- API helper ----------
 
-function uid() {
-  return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
-function loadState() {
-  const rawCards = localStorage.getItem(STORAGE.cards);
-  if (rawCards) {
-    cards = JSON.parse(rawCards);
-  } else {
-    cards = DEFAULT_CARDS.map((c) => ({ id: uid(), image: '', ...c }));
-    saveCards();
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    let message = `Fehler (${res.status})`;
+    try {
+      const data = await res.json();
+      if (data.error) message = data.error;
+    } catch {
+      // ignore non-JSON error bodies
+    }
+    throw new Error(message);
   }
-
-  const rawProgress = localStorage.getItem(STORAGE.progress);
-  progress = rawProgress ? JSON.parse(rawProgress) : {};
-
-  const rawSettings = localStorage.getItem(STORAGE.settings);
-  if (rawSettings) settings = { ...settings, ...JSON.parse(rawSettings) };
+  if (res.status === 204) return null;
+  return res.json();
 }
 
-function saveCards() {
-  localStorage.setItem(STORAGE.cards, JSON.stringify(cards));
+// ---------- Local UI settings ----------
+
+function loadLocalSettings() {
+  const raw = localStorage.getItem(SETTINGS_KEY);
+  if (raw) settings = { ...settings, ...JSON.parse(raw) };
 }
-function saveProgress() {
-  localStorage.setItem(STORAGE.progress, JSON.stringify(progress));
+function saveLocalSettings() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
-function saveSettings() {
-  localStorage.setItem(STORAGE.settings, JSON.stringify(settings));
+
+// ---------- Server data ----------
+
+async function fetchCards() {
+  cards = await api('/api/cards');
+}
+async function fetchProgress() {
+  progress = await api('/api/cards/progress/all');
+}
+
+async function createCard(data) {
+  const card = await api('/api/cards', { method: 'POST', body: JSON.stringify(data) });
+  cards.push(card);
+  return card;
+}
+async function updateCardApi(id, data) {
+  const card = await api(`/api/cards/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  const idx = cards.findIndex((c) => c.id === card.id);
+  if (idx !== -1) cards[idx] = card;
+  return card;
+}
+async function deleteCardApi(id) {
+  await api(`/api/cards/${id}`, { method: 'DELETE' });
+  cards = cards.filter((c) => c.id !== id);
+  delete progress[id];
+}
+async function importCardsApi(items, mode) {
+  cards = await api('/api/cards/import', { method: 'POST', body: JSON.stringify({ cards: items, mode }) });
+}
+async function resetCardsApi() {
+  cards = await api('/api/cards/reset', { method: 'POST' });
+  progress = {};
+}
+function pushProgress(cardId, box, due) {
+  api(`/api/cards/progress/${cardId}`, { method: 'PUT', body: JSON.stringify({ box, due }) }).catch((err) =>
+    console.error('Fortschritt konnte nicht gespeichert werden:', err)
+  );
 }
 
 // ---------- Tabs ----------
@@ -220,7 +253,7 @@ function answer(known) {
   }
   p.due = Date.now() + BOX_INTERVALS[p.box];
   progress[currentCardId] = p;
-  saveProgress();
+  pushProgress(currentCardId, p.box, p.due);
 
   queueIndex++;
   showNextCard();
@@ -265,7 +298,7 @@ function renderCardList() {
 
     const words = document.createElement('div');
     words.className = 'card-row-words';
-    words.innerHTML = `<strong>${card.category || 'Ohne Kategorie'}</strong>
+    words.innerHTML = `<strong>${escapeHtml(card.category) || 'Ohne Kategorie'}</strong>
       🇸🇮 ${escapeHtml(card.sl)} · 🇬🇧 ${escapeHtml(card.en)} · 🇩🇪 ${escapeHtml(card.de)} · 🇫🇷 ${escapeHtml(card.fr)}`;
     row.appendChild(words);
 
@@ -306,7 +339,7 @@ function resetForm() {
 function startEditCard(id) {
   const card = cards.find((c) => c.id === id);
   if (!card) return;
-  document.getElementById('edit-id').value = card.id;
+  document.getElementById('edit-id').value = String(card.id);
   document.getElementById('field-category').value = card.category || '';
   document.getElementById('field-sl').value = card.sl;
   document.getElementById('field-en').value = card.en;
@@ -331,16 +364,17 @@ function startEditCard(id) {
   document.getElementById('field-sl').focus();
 }
 
-function deleteCard(id) {
+async function deleteCard(id) {
   if (!confirm('Diese Karte wirklich löschen?')) return;
-  cards = cards.filter((c) => c.id !== id);
-  delete progress[id];
-  saveCards();
-  saveProgress();
-  renderCardList();
+  try {
+    await deleteCardApi(id);
+    renderCardList();
+  } catch (err) {
+    alert('Löschen fehlgeschlagen: ' + err.message);
+  }
 }
 
-function handleFormSubmit(e) {
+async function handleFormSubmit(e) {
   e.preventDefault();
   const editId = document.getElementById('edit-id').value;
   const imageUrl = document.getElementById('field-image-url').value.trim();
@@ -355,15 +389,17 @@ function handleFormSubmit(e) {
     image,
   };
 
-  if (editId) {
-    const idx = cards.findIndex((c) => c.id === editId);
-    if (idx !== -1) cards[idx] = { ...cards[idx], ...data };
-  } else {
-    cards.push({ id: uid(), ...data });
+  try {
+    if (editId) {
+      await updateCardApi(Number(editId), data);
+    } else {
+      await createCard(data);
+    }
+    resetForm();
+    renderCardList();
+  } catch (err) {
+    alert('Speichern fehlgeschlagen: ' + err.message);
   }
-  saveCards();
-  resetForm();
-  renderCardList();
 }
 
 function handleImageFile(e) {
@@ -396,7 +432,7 @@ function importCards(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const imported = JSON.parse(reader.result);
       if (!Array.isArray(imported)) throw new Error('invalid');
@@ -404,7 +440,6 @@ function importCards(e) {
         `${imported.length} Karte(n) gefunden. OK = Vorhandene Karten ERSETZEN, Abbrechen = zu vorhandenen HINZUFÜGEN.`
       );
       const normalized = imported.map((c) => ({
-        id: c.id || uid(),
         category: c.category || '',
         sl: c.sl || '',
         en: c.en || '',
@@ -412,28 +447,118 @@ function importCards(e) {
         fr: c.fr || '',
         image: c.image || '',
       }));
-      cards = replace ? normalized : [...cards, ...normalized];
-      saveCards();
+      await importCardsApi(normalized, replace ? 'replace' : 'add');
+      if (replace) {
+        progress = {};
+        await fetchProgress();
+      }
       renderCardList();
       refreshCategoryOptions();
       alert('Import erfolgreich.');
     } catch (err) {
-      alert('Import fehlgeschlagen: ungültige Datei.');
+      alert('Import fehlgeschlagen: ' + (err.message === 'invalid' ? 'ungültige Datei.' : err.message));
     }
     e.target.value = '';
   };
   reader.readAsText(file);
 }
 
-function resetToDefaults() {
+async function resetToDefaults() {
   if (!confirm('Wirklich alle Karten und den Lernfortschritt auf die Standardliste zurücksetzen?')) return;
-  cards = DEFAULT_CARDS.map((c) => ({ id: uid(), image: '', ...c }));
-  progress = {};
-  saveCards();
-  saveProgress();
-  renderCardList();
-  refreshCategoryOptions();
-  startSession(buildQueue());
+  try {
+    await resetCardsApi();
+    renderCardList();
+    refreshCategoryOptions();
+    startSession(buildQueue());
+  } catch (err) {
+    alert('Zurücksetzen fehlgeschlagen: ' + err.message);
+  }
+}
+
+// ---------- Auth ----------
+
+function initAuthTabs() {
+  document.querySelectorAll('.auth-tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.auth-tab-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const which = btn.dataset.authTab;
+      document.getElementById('login-form').classList.toggle('hidden', which !== 'login');
+      document.getElementById('register-form').classList.toggle('hidden', which !== 'register');
+      document.getElementById('login-error').classList.add('hidden');
+      document.getElementById('register-error').classList.add('hidden');
+    });
+  });
+}
+
+function initAuthForms() {
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('login-error');
+    errEl.classList.add('hidden');
+    try {
+      const data = await api('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: document.getElementById('login-email').value.trim(),
+          password: document.getElementById('login-password').value,
+        }),
+      });
+      await onAuthSuccess(data.email);
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+    }
+  });
+
+  document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('register-error');
+    errEl.classList.add('hidden');
+    try {
+      const data = await api('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: document.getElementById('register-email').value.trim(),
+          password: document.getElementById('register-password').value,
+        }),
+      });
+      await onAuthSuccess(data.email);
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+    }
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    try {
+      await api('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // ignore
+    }
+    location.reload();
+  });
+}
+
+async function onAuthSuccess(email) {
+  document.getElementById('account-email').textContent = email;
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app-shell').classList.remove('hidden');
+  await loadAppData();
+}
+
+async function checkAuth() {
+  try {
+    const me = await api('/api/auth/me');
+    document.getElementById('account-email').textContent = me.email;
+    document.getElementById('auth-screen').classList.add('hidden');
+    document.getElementById('app-shell').classList.remove('hidden');
+    return true;
+  } catch {
+    document.getElementById('auth-screen').classList.remove('hidden');
+    document.getElementById('app-shell').classList.add('hidden');
+    return false;
+  }
 }
 
 // ---------- Init ----------
@@ -441,29 +566,29 @@ function resetToDefaults() {
 function initEventListeners() {
   document.getElementById('lang-from').addEventListener('change', (e) => {
     settings.from = e.target.value;
-    saveSettings();
+    saveLocalSettings();
     startSession(buildQueue());
   });
   document.getElementById('lang-to').addEventListener('change', (e) => {
     settings.to = e.target.value;
-    saveSettings();
+    saveLocalSettings();
     startSession(buildQueue());
   });
   document.getElementById('swap-langs').addEventListener('click', () => {
     [settings.from, settings.to] = [settings.to, settings.from];
     document.getElementById('lang-from').value = settings.from;
     document.getElementById('lang-to').value = settings.to;
-    saveSettings();
+    saveLocalSettings();
     startSession(buildQueue());
   });
   document.getElementById('category-filter').addEventListener('change', (e) => {
     settings.category = e.target.value;
-    saveSettings();
+    saveLocalSettings();
     startSession(buildQueue());
   });
   document.getElementById('due-only').addEventListener('change', (e) => {
     settings.dueOnly = e.target.checked;
-    saveSettings();
+    saveLocalSettings();
     startSession(buildQueue());
   });
 
@@ -510,16 +635,26 @@ function initEventListeners() {
   document.getElementById('reset-btn').addEventListener('click', resetToDefaults);
 }
 
-function init() {
-  loadState();
+async function loadAppData() {
+  await Promise.all([fetchCards(), fetchProgress()]);
+  refreshCategoryOptions();
+  document.getElementById('category-filter').value = settings.category;
+  startSession(buildQueue());
+}
+
+async function init() {
+  loadLocalSettings();
   document.getElementById('lang-from').value = settings.from;
   document.getElementById('lang-to').value = settings.to;
   document.getElementById('due-only').checked = settings.dueOnly;
-  refreshCategoryOptions();
-  document.getElementById('category-filter').value = settings.category;
+
   initTabs();
   initEventListeners();
-  startSession(buildQueue());
+  initAuthTabs();
+  initAuthForms();
+
+  const authed = await checkAuth();
+  if (authed) await loadAppData();
 }
 
 document.addEventListener('DOMContentLoaded', init);

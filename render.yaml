@@ -1,0 +1,22 @@
+databases:
+  - name: lernen-sprachen-db
+    plan: free
+    databaseName: lernen_sprachen
+    user: lernen_sprachen
+
+services:
+  - type: web
+    name: lernen-sprachen
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lernen-sprachen-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production

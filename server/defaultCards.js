@@ -66,3 +66,5 @@ const DEFAULT_CARDS = [
 
   { category: 'Gefühle', sl: 'ljubezen', en: 'love', de: 'Liebe', fr: 'amour' },
 ];
+
+module.exports = { DEFAULT_CARDS };

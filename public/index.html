@@ -9,6 +9,36 @@
 </head>
 <body>
 
+<!-- AUTH SCREEN -->
+<section id="auth-screen" class="auth-screen">
+  <div class="auth-box">
+    <h1>🗂️ Lernen Sprachen</h1>
+    <p class="auth-subtitle">Karteikarten für Slowenisch · English · Deutsch · Français</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab-btn active" data-auth-tab="login">Anmelden</button>
+      <button class="auth-tab-btn" data-auth-tab="register">Registrieren</button>
+    </div>
+
+    <form id="login-form" class="auth-form">
+      <label>E-Mail <input type="email" id="login-email" required autocomplete="username"></label>
+      <label>Passwort <input type="password" id="login-password" required autocomplete="current-password"></label>
+      <p class="auth-error hidden" id="login-error"></p>
+      <button type="submit" class="btn btn-primary">Anmelden</button>
+    </form>
+
+    <form id="register-form" class="auth-form hidden">
+      <label>E-Mail <input type="email" id="register-email" required autocomplete="username"></label>
+      <label>Passwort (mind. 8 Zeichen) <input type="password" id="register-password" required minlength="8" autocomplete="new-password"></label>
+      <p class="auth-error hidden" id="register-error"></p>
+      <button type="submit" class="btn btn-primary">Konto erstellen</button>
+    </form>
+  </div>
+</section>
+
+<!-- APP -->
+<div id="app-shell" class="hidden">
+
 <header class="app-header">
   <h1>🗂️ Lernen Sprachen</h1>
   <nav class="tabs">
@@ -16,6 +46,10 @@
     <button class="tab-btn" data-tab="manage">Karten verwalten</button>
     <button class="tab-btn" data-tab="data">Import / Export</button>
   </nav>
+  <div class="account-bar">
+    <span id="account-email"></span>
+    <button id="logout-btn" class="btn">Abmelden</button>
+  </div>
 </header>
 
 <main>
@@ -170,10 +204,11 @@
 </main>
 
 <footer class="app-footer">
-  <p>Karteikarten für Slowenisch · English · Deutsch · Français — deine Daten bleiben lokal im Browser gespeichert.</p>
+  <p>Karteikarten für Slowenisch · English · Deutsch · Français — deine Karten sind an dein Konto gebunden.</p>
 </footer>
 
-<script src="js/data.js"></script>
+</div>
+
 <script src="js/app.js"></script>
 </body>
 </html>
