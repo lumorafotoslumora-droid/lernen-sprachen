@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const { pool } = require('../db');
 const { setAuthCookie, clearAuthCookie, requireAuth } = require('../auth');
-const { DEFAULT_CARDS } = require('../defaultCards');
+const { STARTER_CARDS } = require('../defaultCards');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -45,7 +45,7 @@ module.exports = function authRoutes(secret) {
       );
       const userId = userResult.rows[0].id;
 
-      for (const card of DEFAULT_CARDS) {
+      for (const card of STARTER_CARDS) {
         await client.query(
           'INSERT INTO cards (user_id, category, sl, en, de, fr, image) VALUES ($1, $2, $3, $4, $5, $6, $7)',
           [userId, card.category || '', card.sl, card.en, card.de, card.fr, '']

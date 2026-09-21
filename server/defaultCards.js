@@ -67,4 +67,10 @@ const DEFAULT_CARDS = [
   { category: 'Gefühle', sl: 'ljubezen', en: 'love', de: 'Liebe', fr: 'amour' },
 ];
 
-module.exports = { DEFAULT_CARDS };
+// Nur diese 2 Beispielkarten bekommt ein neu registriertes Konto, damit man
+// direkt sieht, wie eine Karte aufgebaut ist, ohne mit 50 Wörtern erschlagen
+// zu werden. Die volle DEFAULT_CARDS-Liste bleibt über "Zurücksetzen auf
+// Standard" (Tab Import/Export) weiterhin verfügbar.
+const STARTER_CARDS = DEFAULT_CARDS.slice(0, 2);
+
+module.exports = { DEFAULT_CARDS, STARTER_CARDS };

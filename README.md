@@ -34,8 +34,9 @@ gespeichert, nicht nur lokal im Browser.
 - Tastatursteuerung: `Leertaste` = umdrehen, `→`/`1` = gewusst, `←`/`0` =
   nicht gewusst, `s` = Aussprache anhören.
 
-Bei der Registrierung bekommt jedes Konto automatisch die Standard-Wortliste
-als Startdeck.
+Bei der Registrierung bekommt jedes Konto zunächst nur 2 Beispielkarten, um
+das Prinzip zu zeigen — die volle Standard-Wortliste (~50 Wörter) lässt sich
+jederzeit über "Zurücksetzen auf Standard" im Tab Import/Export laden.
 
 ## Architektur
 
