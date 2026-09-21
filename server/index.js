@@ -16,8 +16,23 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
+async function initSchemaWithRetry(maxAttempts = 15, delayMs = 4000) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await initSchema();
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      console.log(
+        `Datenbank noch nicht erreichbar (Versuch ${attempt}/${maxAttempts}): ${err.message}. Erneuter Versuch in ${delayMs / 1000}s...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 async function main() {
-  await initSchema();
+  await initSchemaWithRetry();
 
   const app = express();
   app.disable('x-powered-by');
